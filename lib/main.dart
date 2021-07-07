@@ -1,7 +1,8 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
-import 'screens/auth_screen.dart';
+import './screens/auth_screen.dart';
+import './screens/chat_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -22,19 +23,22 @@ class _MyAppState extends State<MyApp> {
       builder: (ctx, appSnapshot) => MaterialApp(
         title: 'Flutter Demo',
         theme: ThemeData(
-          primarySwatch: Colors.red,
+          primarySwatch: Colors.purple,
           backgroundColor: Colors.red[100],
           accentColor: Colors.purpleAccent[600],
           accentColorBrightness: Brightness.dark,
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
-              primary: Colors.red,
+              primary: Colors.purple,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
             ),
           ),
         ),
+        routes: {
+          ChatScreen.routeName: (ctx) => ChatScreen(),
+        },
         home: appSnapshot.connectionState == ConnectionState.waiting
             ? const Scaffold(
                 body: Center(
