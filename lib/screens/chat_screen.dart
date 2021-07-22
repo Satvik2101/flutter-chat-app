@@ -1,40 +1,78 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-class ChatScreen extends StatelessWidget {
+import '../widgets/chat/messages.dart';
+import '../widgets/chat/new_message.dart';
+
+class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
   static const routeName = '/chat-screen';
+
+  @override
+  _ChatScreenState createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  @override
+  void initState() {
+    super.initState();
+    final fbm = FirebaseMessaging.instance;
+    fbm.requestPermission();
+    
+    FirebaseMessaging.onMessage.listen((event) {
+      print(event);
+    });
+    FirebaseMessaging.onMessageOpenedApp.listen((event) {
+      print(event);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: StreamBuilder(
-        stream: FirebaseFirestore.instance
-            .collection('chats/5JWofFNT06J2UNl36VJI/messages')
-            .snapshots(),
-        builder: (ctx,
-            AsyncSnapshot<QuerySnapshot<Map<String, dynamic>>> streamSnapshot) {
-          if (streamSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final documentsData = streamSnapshot.data?.docs;
-          return ListView.builder(
-            itemCount: documentsData?.length,
-            itemBuilder: (ctx, index) => Container(
-              padding: const EdgeInsets.all(8),
-              child: Text(documentsData?[index]['text']),
+      appBar: AppBar(
+        title: const Text('FlutterChat'),
+        actions: [
+          DropdownButton(
+            underline: const Divider(),
+            icon: Icon(
+              Icons.more_vert,
+              color: Theme.of(context).primaryIconTheme.color,
             ),
-          );
-        },
+            items: [
+              DropdownMenuItem(
+                child: Row(
+                  children: const [
+                    Icon(
+                      Icons.logout,
+                      color: Colors.black,
+                    ),
+                    SizedBox(
+                      width: 5,
+                    ),
+                    Text('Logout'),
+                  ],
+                ),
+                value: 'logout',
+              )
+            ],
+            onChanged: (value) async {
+              if (value == 'logout') {
+                await FirebaseAuth.instance.signOut();
+              }
+            },
+          )
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () {
-          FirebaseFirestore.instance
-              .collection('chats/5JWofFNT06J2UNl36VJI/messages')
-              .add(
-            {'text': 'This was added by floating action button'},
-          );
-        },
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Column(
+          children: const [
+            const Expanded(child: Messages()),
+            const NewMessage(),
+          ],
+        ),
       ),
     );
   }

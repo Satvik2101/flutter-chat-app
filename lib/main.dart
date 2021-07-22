@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
@@ -21,11 +22,12 @@ class _MyAppState extends State<MyApp> {
     return FutureBuilder(
       future: _initialization,
       builder: (ctx, appSnapshot) => MaterialApp(
+        
         title: 'Flutter Demo',
         theme: ThemeData(
           primarySwatch: Colors.purple,
           backgroundColor: Colors.red[100],
-          accentColor: Colors.purpleAccent[600],
+          accentColor: Colors.purpleAccent[700],
           accentColorBrightness: Brightness.dark,
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
@@ -37,15 +39,26 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
         routes: {
-          ChatScreen.routeName: (ctx) => ChatScreen(),
+          ChatScreen.routeName: (ctx) => const ChatScreen(),
         },
         home: appSnapshot.connectionState == ConnectionState.waiting
             ? const Scaffold(
+            
                 body: Center(
                   child: CircularProgressIndicator(),
                 ),
               )
-            : const AuthScreen(),
+            : StreamBuilder(
+                stream: FirebaseAuth.instance.authStateChanges(),
+                builder: (ctx, AsyncSnapshot<User?> userSnapshot) {
+                  if (userSnapshot.hasData &&
+                      !userSnapshot.hasError &&
+                      (userSnapshot.data?.emailVerified ?? false))
+                    return const ChatScreen();
+                  else
+                    return const AuthScreen();
+                },
+              ),
       ),
     );
   }

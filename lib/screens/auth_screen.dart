@@ -3,11 +3,12 @@ import 'dart:io';
 
 import 'package:android_intent/android_intent.dart';
 import 'package:android_intent/flag.dart';
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
-import '../screens/chat_screen.dart';
 import '../widgets/auth/auth_form.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -19,7 +20,7 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final _auth = FirebaseAuth.instance;
-  late Timer timer;
+  Timer timer = Timer(Duration.zero, () {});
   bool isLoading = false;
 
   Future<void> _showEmailVerificationDialog(BuildContext context) async {
@@ -28,8 +29,8 @@ class _AuthScreenState extends State<AuthScreen> {
       builder: (context) {
         return AlertDialog(
           title: const Text('Please verify email.'),
-          content:
-              const Text('Please check your email to verify your account.'),
+          content: const Text(
+              'Please check your email to verify your account.(It may take a few minutes to arrive)'),
           actions: <Widget>[
             TextButton(
               child: const Text('OK'),
@@ -58,10 +59,18 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Future<void> _submitAuthForm(String email, String password, String username,
-      bool isLogin, BuildContext ctx) async {
+  Future<void> _submitAuthForm(
+    String email,
+    String password,
+    String username,
+    File? image,
+    bool isLogin,
+    BuildContext ctx,
+  ) async {
     UserCredential userCredential;
-
+    setState(() {
+      isLoading = true;
+    });
     try {
       if (isLogin) {
         userCredential = await _auth.signInWithEmailAndPassword(
@@ -73,22 +82,40 @@ class _AuthScreenState extends State<AuthScreen> {
           email: email,
           password: password,
         );
+
+        final ref = FirebaseStorage.instance
+            .ref()
+            .child('user-images')
+            .child(userCredential.user!.uid + '.jpg');
+
+        await ref.putFile(image!);
+        final url = await ref.getDownloadURL();
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set(
+          {
+            'username': username,
+            'email': email,
+            'image_url': url,
+          },
+        );
       }
+
       User? user = FirebaseAuth.instance.currentUser;
 
       if (user != null && !user.emailVerified) {
-        setState(() {
-          isLoading = true;
-        });
         await user.sendEmailVerification();
         await _showEmailVerificationDialog(context);
         timer = Timer.periodic(const Duration(seconds: 2), (timer) {
-          checkEmailVerified();
+          checkEmailVerified(email, password);
         });
-      } else {
-        Navigator.of(context).pushReplacementNamed(ChatScreen.routeName);
       }
     } on FirebaseException catch (e) {
+      setState(() {
+        isLoading = false;
+      });
       ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(
           content: Text(e.message ?? 'An error occured'),
@@ -100,26 +127,28 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  Future<void> checkEmailVerified() async {
+  Future<void> checkEmailVerified(String email, String password) async {
     User user = _auth.currentUser!;
     await user.reload();
     if (user.emailVerified) {
-      Navigator.of(context).pushReplacementNamed(ChatScreen.routeName);
+      FirebaseAuth.instance.signOut();
+      FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
       timer.cancel();
     }
+  }
+
+  @override
+  void dispose() {
+    timer.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).primaryColor,
-      body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: Colors.red,
-              ),
-            )
-          : AuthForm(_submitAuthForm),
+      body: AuthForm(_submitAuthForm, isLoading),
     );
   }
 }
